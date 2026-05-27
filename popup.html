@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>JD Resume Tailor</title>
+    <link rel="stylesheet" href="styles/popup.css">
+  </head>
+  <body>
+    <main class="popup">
+      <header class="popup__header">
+        <div>
+          <h1>JD Resume Tailor</h1>
+          <p>岗位简历定制</p>
+        </div>
+      </header>
+
+      <section class="popup__actions">
+        <button id="capture-open" class="button button--primary" type="button">
+          抓取本页 JD 并打开工作台
+        </button>
+        <button id="open-workspace" class="button" type="button">
+          打开工作台
+        </button>
+      </section>
+
+      <p id="status" class="status" aria-live="polite"></p>
+    </main>
+    <script src="src/popup.js"></script>
+  </body>
+</html>

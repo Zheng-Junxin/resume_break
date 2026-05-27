@@ -1,0 +1,141 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: #151a22;
+  background: #eef2f7;
+  font: 14px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.export-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding: 12px;
+  border-bottom: 1px solid #d9e0ea;
+  background: #ffffff;
+}
+
+.button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #b7c3d3;
+  border-radius: 6px;
+  color: #162033;
+  background: #ffffff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.button--primary {
+  border-color: #255a9c;
+  color: #ffffff;
+  background: #255a9c;
+}
+
+.resume-document {
+  width: min(900px, calc(100% - 32px));
+  min-height: 1120px;
+  margin: 16px auto;
+  padding: 42px 52px;
+  background: #ffffff;
+  box-shadow: 0 14px 36px rgba(20, 32, 48, 0.14);
+}
+
+.resume {
+  color: #151a22;
+  font-family: Georgia, "Times New Roman", "Noto Serif SC", serif;
+}
+
+.resume__header {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #1b365d;
+}
+
+.resume__header-main {
+  min-width: 0;
+}
+
+.resume__avatar {
+  flex: 0 0 auto;
+  width: 86px;
+  height: 108px;
+  border: 1px solid #c7d1df;
+  object-fit: cover;
+  background: #edf2f7;
+}
+
+.resume__name {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.resume__contact {
+  margin-top: 8px;
+  color: #4a5567;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 12px;
+}
+
+.resume__section {
+  margin-top: 17px;
+}
+
+.resume__section h2 {
+  margin: 0 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #c7d1df;
+  color: #1b365d;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.resume__section p,
+.resume__section li {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.resume__section p {
+  margin: 0 0 6px;
+}
+
+.resume__section ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  .export-toolbar {
+    display: none;
+  }
+
+  .resume-document {
+    width: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+}
+
+@page {
+  size: A4;
+  margin: 16mm 15mm;
+}

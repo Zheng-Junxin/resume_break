@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>岗位简历定制工作台</title>
+    <link rel="stylesheet" href="styles/app.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>岗位简历定制工作台</h1>
+        <p>本地解析、结构化编辑、JD 匹配、LLM 优化、PDF / Word 导出</p>
+      </div>
+      <div class="topbar__actions">
+        <button id="capture-jd" class="button" type="button">抓取 JD</button>
+        <button id="save-data" class="button" type="button">保存</button>
+        <button id="export-pdf" class="button button--primary" type="button">PDF</button>
+        <button id="export-word" class="button button--primary" type="button">Word</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="panel panel--source">
+        <div class="panel__head">
+          <h2>简历来源</h2>
+          <span id="resume-state" class="badge">未解析</span>
+        </div>
+
+        <label class="field">
+          <span>上传简历</span>
+          <input id="resume-file" type="file" accept=".txt,.md,.html,.htm,.doc,.docx,.pdf">
+        </label>
+
+        <label class="field">
+          <span>头像</span>
+          <input id="avatar-file" type="file" accept="image/png,image/jpeg,image/webp">
+        </label>
+        <div class="avatar-row">
+          <img id="avatar-preview" class="avatar-preview" alt="头像预览">
+          <button id="remove-avatar" class="button button--compact" type="button">移除头像</button>
+        </div>
+
+        <label class="field">
+          <span>原始简历文本</span>
+          <textarea id="raw-resume" rows="12" spellcheck="false" placeholder="粘贴简历文本，或上传 TXT / HTML / DOCX / PDF 文件。"></textarea>
+        </label>
+
+        <div class="row">
+          <button id="parse-resume" class="button button--primary" type="button">解析简历</button>
+          <button id="clear-resume" class="button" type="button">清空</button>
+        </div>
+        <p id="file-status" class="note" aria-live="polite"></p>
+
+        <div class="settings-block">
+          <div class="panel__head">
+            <h2>模型设置</h2>
+            <span id="llm-state" class="badge">未配置</span>
+          </div>
+          <label class="field">
+            <span>Base URL</span>
+            <input id="llm-base-url" type="url" placeholder="https://api.openai.com/v1">
+          </label>
+          <label class="field">
+            <span>Model</span>
+            <input id="llm-model" type="text" placeholder="gpt-4o-mini">
+          </label>
+          <label class="field">
+            <span>API Key</span>
+            <input id="llm-api-key" type="password" autocomplete="off" placeholder="sk-...">
+          </label>
+          <div class="row">
+            <button id="save-settings" class="button" type="button">保存设置</button>
+            <button id="test-llm" class="button" type="button">测试连接</button>
+          </div>
+          <p class="note">仅在点击 LLM 按钮时发送 JD / 简历到你配置的服务商；密钥保存在浏览器本地。</p>
+        </div>
+      </section>
+
+      <section class="panel panel--editor">
+        <div class="panel__head">
+          <h2>结构化编辑</h2>
+          <div class="row">
+            <button id="llm-format-all" class="button button--compact" type="button">LLM 统一格式</button>
+            <button id="apply-tailored" class="button button--compact" type="button">应用定制稿</button>
+          </div>
+        </div>
+        <div id="section-editor" class="section-stack"></div>
+      </section>
+
+      <section class="panel panel--insights">
+        <div class="panel__head">
+          <h2>JD 匹配</h2>
+          <span id="jd-state" class="badge">未载入</span>
+        </div>
+        <label class="field">
+          <span>岗位 JD</span>
+          <textarea id="jd-text" rows="8" spellcheck="false" placeholder="在招聘页面点击扩展按钮抓取，或在这里粘贴 JD。"></textarea>
+        </label>
+        <div class="row">
+          <button id="analyze-jd" class="button" type="button">本地解析 JD</button>
+          <button id="llm-analyze-jd" class="button" type="button">LLM 解析 JD</button>
+          <button id="tailor-resume" class="button button--primary" type="button">本地定制</button>
+          <button id="llm-tailor-resume" class="button button--primary" type="button">LLM 定制</button>
+        </div>
+        <div class="keywords" id="keywords"></div>
+        <div class="suggestions" id="suggestions"></div>
+        <div class="preview-wrap">
+          <div class="preview-head">
+            <h2>定制预览</h2>
+            <span id="preview-state" class="badge">基础版</span>
+          </div>
+          <div id="resume-preview" class="resume-document"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="src/resume-core.js"></script>
+    <script src="src/app.js"></script>
+  </body>
+</html>
