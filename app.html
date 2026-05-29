@@ -113,6 +113,91 @@
           <div id="resume-preview" class="resume-document"></div>
         </div>
       </section>
+
+      <section class="panel panel--autopilot">
+        <div class="panel__head">
+          <h2>自动搜索 / 自动投递</h2>
+          <span id="autopilot-state" class="badge">待命</span>
+        </div>
+        <div class="autopilot-grid">
+          <div>
+            <label class="field">
+              <span>搜索关键词</span>
+              <input id="auto-keywords" type="text" placeholder="Python 后端 实习">
+            </label>
+            <label class="field">
+              <span>地点</span>
+              <input id="auto-location" type="text" placeholder="上海 / Remote">
+            </label>
+            <label class="field">
+              <span>搜索 URL 模板</span>
+              <textarea id="auto-search-urls" rows="6" spellcheck="false" placeholder="每行一个搜索 URL，可使用 {keywords} 和 {location}。"></textarea>
+            </label>
+          </div>
+          <div>
+            <label class="field">
+              <span>必须包含</span>
+              <input id="auto-include" type="text" placeholder="Python, Flask, SQL">
+            </label>
+            <label class="field">
+              <span>排除关键词</span>
+              <input id="auto-exclude" type="text" placeholder="外包, 销售, 培训">
+            </label>
+            <div class="inline-fields">
+              <label class="field">
+                <span>最低匹配分</span>
+                <input id="auto-min-score" type="number" min="0" max="100" step="5" value="45">
+              </label>
+              <label class="field">
+                <span>最多投递</span>
+                <input id="auto-max-apply" type="number" min="1" max="50" step="1" value="5">
+              </label>
+              <label class="field">
+                <span>最多职位页</span>
+                <input id="auto-max-jobs" type="number" min="1" max="100" step="1" value="20">
+              </label>
+            </div>
+            <label class="check-row">
+              <input id="auto-submit" type="checkbox">
+              <span>允许自动点击最终投递 / Submit</span>
+            </label>
+            <label class="check-row">
+              <input id="auto-close-tabs" type="checkbox" checked>
+              <span>自动关闭已处理标签页</span>
+            </label>
+          </div>
+          <div>
+            <label class="field">
+              <span>姓名</span>
+              <input id="auto-name" type="text">
+            </label>
+            <label class="field">
+              <span>邮箱</span>
+              <input id="auto-email" type="text">
+            </label>
+            <label class="field">
+              <span>手机</span>
+              <input id="auto-phone" type="text">
+            </label>
+            <label class="field">
+              <span>LinkedIn / 作品集</span>
+              <input id="auto-portfolio" type="text">
+            </label>
+          </div>
+          <div>
+            <label class="field">
+              <span>自动填充求职信</span>
+              <textarea id="auto-cover-letter" rows="9" spellcheck="false" placeholder="支持 {jobTitle}、{company}、{keywords}、{name}。"></textarea>
+            </label>
+            <div class="row">
+              <button id="autopilot-start" class="button button--primary" type="button">开始自动搜索</button>
+              <button id="autopilot-stop" class="button" type="button">停止</button>
+              <button id="autopilot-save" class="button" type="button">保存配置</button>
+            </div>
+          </div>
+        </div>
+        <div id="autopilot-log" class="autopilot-log" aria-live="polite"></div>
+      </section>
     </main>
 
     <script src="src/resume-core.js"></script>
