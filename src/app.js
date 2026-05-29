@@ -10,9 +10,7 @@
       baseUrl: "",
       model: "",
       apiKey: ""
-    },
-    autopilot: defaultAutopilotSettings(),
-    autopilotRunning: false
+    }
   };
 
   const els = {
@@ -48,26 +46,8 @@
     saveSettings: document.getElementById("save-settings"),
     testLlm: document.getElementById("test-llm"),
     llmState: document.getElementById("llm-state"),
-    autoKeywords: document.getElementById("auto-keywords"),
-    autoLocation: document.getElementById("auto-location"),
-    autoSearchUrls: document.getElementById("auto-search-urls"),
-    autoInclude: document.getElementById("auto-include"),
-    autoExclude: document.getElementById("auto-exclude"),
-    autoMinScore: document.getElementById("auto-min-score"),
-    autoMaxApply: document.getElementById("auto-max-apply"),
-    autoMaxJobs: document.getElementById("auto-max-jobs"),
-    autoSubmit: document.getElementById("auto-submit"),
-    autoCloseTabs: document.getElementById("auto-close-tabs"),
-    autoName: document.getElementById("auto-name"),
-    autoEmail: document.getElementById("auto-email"),
-    autoPhone: document.getElementById("auto-phone"),
-    autoPortfolio: document.getElementById("auto-portfolio"),
-    autoCoverLetter: document.getElementById("auto-cover-letter"),
-    autopilotStart: document.getElementById("autopilot-start"),
-    autopilotStop: document.getElementById("autopilot-stop"),
-    autopilotSave: document.getElementById("autopilot-save"),
-    autopilotLog: document.getElementById("autopilot-log"),
-    autopilotState: document.getElementById("autopilot-state")
+    addSection: document.getElementById("add-section"),
+    resumeTemplate: document.getElementById("resume-template")
   };
 
   document.addEventListener("DOMContentLoaded", init);
@@ -96,9 +76,16 @@
     els.exportWord.addEventListener("click", exportWord);
     els.saveSettings.addEventListener("click", saveSettings);
     els.testLlm.addEventListener("click", () => runWithBusy(els.testLlm, "测试中", testLlmConnection));
-    els.autopilotStart.addEventListener("click", () => runWithBusy(els.autopilotStart, "运行中", startAutopilot));
-    els.autopilotStop.addEventListener("click", stopAutopilot);
-    els.autopilotSave.addEventListener("click", saveAutopilotSettings);
+    els.addSection.addEventListener("click", addCustomSection);
+    els.resumeTemplate.addEventListener("change", () => {
+      collectProfileFromEditors();
+      state.profile.template = els.resumeTemplate.value;
+      if (state.tailoredProfile) {
+        state.tailoredProfile.template = els.resumeTemplate.value;
+      }
+      renderPreview(state.tailoredProfile || state.profile, state.tailoredProfile ? "定制稿" : "基础版");
+      saveState();
+    });
     els.jdText.addEventListener("input", () => {
       state.jd = Object.assign({}, state.jd || {}, { text: els.jdText.value });
       updateJdState();
@@ -111,20 +98,18 @@
       "rawResumeText",
       "currentJD",
       "tailoredProfile",
-      "llmSettings",
-      "autopilotSettings"
+      "llmSettings"
     ]);
     state.profile = core.normalizeProfile(stored.resumeProfile);
-    state.tailoredProfile = stored.tailoredProfile || null;
+    state.tailoredProfile = stored.tailoredProfile ? core.normalizeProfile(stored.tailoredProfile) : null;
     state.jd = stored.currentJD || null;
     state.llmSettings = Object.assign(state.llmSettings, stored.llmSettings || {});
-    state.autopilot = Object.assign(defaultAutopilotSettings(), stored.autopilotSettings || {});
     els.rawResume.value = stored.rawResumeText || state.profile.raw || "";
     els.jdText.value = state.jd && state.jd.text ? state.jd.text : "";
     els.llmBaseUrl.value = state.llmSettings.baseUrl || "";
     els.llmModel.value = state.llmSettings.model || "";
     els.llmApiKey.value = state.llmSettings.apiKey || "";
-    populateAutopilotSettings();
+    els.resumeTemplate.value = core.normalizeTemplateId((state.tailoredProfile || state.profile).template);
   }
 
   async function handleFileUpload(event) {
@@ -194,8 +179,10 @@
 
   function parseResume() {
     const previousAvatar = state.profile.avatarDataUrl;
+    const previousTemplate = els.resumeTemplate.value || state.profile.template;
     state.profile = core.parseResumeText(els.rawResume.value);
     state.profile.avatarDataUrl = previousAvatar;
+    state.profile.template = previousTemplate;
     state.tailoredProfile = null;
     renderSectionEditor();
     renderPreview(state.profile, "基础版");
@@ -422,8 +409,9 @@
   async function formatSectionWithLlm(sectionKey) {
     collectProfileFromEditors();
     const value = core.cleanText(state.profile[sectionKey]);
+    const sectionTitle = core.getSectionTitle(state.profile, sectionKey);
     if (!value) {
-      setSuggestions([{ title: "内容为空", body: `请先填写${core.SECTION_LABELS[sectionKey]}。` }]);
+      setSuggestions([{ title: "内容为空", body: `请先填写${sectionTitle}。` }]);
       return;
     }
 
@@ -435,7 +423,7 @@
       {
         role: "user",
         content: [
-          `请整理简历模块「${core.SECTION_LABELS[sectionKey]}」。`,
+          `请整理简历模块「${sectionTitle}」。`,
           '返回 JSON：{"content":"整理后的文本"}',
           "要求：保留真实信息，表达专业、简洁，适合简历展示。",
           "原文：",
@@ -508,25 +496,29 @@
     document.querySelectorAll("[data-section]").forEach((textarea) => {
       state.profile[textarea.dataset.section] = textarea.value;
     });
+    document.querySelectorAll("[data-section-title]").forEach((input) => {
+      state.profile.sectionTitles = state.profile.sectionTitles || {};
+      state.profile.sectionTitles[input.dataset.sectionTitle] = input.value.trim();
+    });
     state.profile.raw = els.rawResume.value || state.profile.raw || "";
-    state.profile.sectionOrder = core.normalizeSectionOrder(state.profile.sectionOrder);
+    state.profile.template = els.resumeTemplate.value;
+    state.profile.sectionOrder = core.normalizeSectionOrder(state.profile.sectionOrder, state.profile);
   }
 
   function renderAll() {
     updateResumeState();
     updateJdState();
     updateLlmState();
-    updateAutopilotState();
     updateAvatarPreview();
     renderSectionEditor();
-    renderAutopilotLog();
     analyzeJd();
     renderPreview(state.tailoredProfile || state.profile, state.tailoredProfile ? "定制稿" : "基础版");
   }
 
   function renderSectionEditor() {
     const data = core.normalizeProfile(state.profile);
-    const orderedKeys = ["personal", ...core.normalizeSectionOrder(data.sectionOrder)];
+    state.profile = data;
+    const orderedKeys = ["personal", ...core.normalizeSectionOrder(data.sectionOrder, data)];
     els.sectionEditor.innerHTML = "";
     orderedKeys.forEach((key, index) => {
       els.sectionEditor.appendChild(createSectionCard(key, index, key !== "personal"));
@@ -546,9 +538,18 @@
     const number = document.createElement("span");
     number.className = "section-card__index";
     number.textContent = String(index + 1);
-    const text = document.createElement("span");
-    text.textContent = core.SECTION_LABELS[key];
-    title.append(number, text);
+    const titleInput = document.createElement("input");
+    titleInput.className = "section-title-input";
+    titleInput.dataset.sectionTitle = key;
+    titleInput.type = "text";
+    titleInput.value = core.getSectionTitle(state.profile, key);
+    titleInput.addEventListener("input", () => {
+      state.profile.sectionTitles = state.profile.sectionTitles || {};
+      state.profile.sectionTitles[key] = titleInput.value.trim();
+      state.tailoredProfile = null;
+      renderPreview(state.profile, "基础版");
+    });
+    title.append(number, titleInput);
 
     const controls = document.createElement("div");
     controls.className = "section-card__controls";
@@ -557,6 +558,9 @@
         makeCardButton("上移", () => moveSection(key, -1)),
         makeCardButton("下移", () => moveSection(key, 1))
       );
+    }
+    if (core.isCustomSectionKey(key)) {
+      controls.append(makeCardButton("删除", () => removeCustomSection(key)));
     }
     controls.append(makeCardButton("LLM格式", () => runWithBusy(null, "", () => formatSectionWithLlm(key))));
     head.append(title, controls);
@@ -586,7 +590,7 @@
 
   function moveSection(key, direction) {
     collectProfileFromEditors();
-    const order = core.normalizeSectionOrder(state.profile.sectionOrder);
+    const order = core.normalizeSectionOrder(state.profile.sectionOrder, state.profile);
     const index = order.indexOf(key);
     const next = index + direction;
     if (index < 0 || next < 0 || next >= order.length) {
@@ -602,8 +606,38 @@
     saveState();
   }
 
+  function addCustomSection() {
+    collectProfileFromEditors();
+    const key = core.createCustomSectionKey();
+    state.profile.sectionTitles = Object.assign({}, state.profile.sectionTitles, { [key]: "自定义模块" });
+    state.profile.sectionOrder = [...core.normalizeSectionOrder(state.profile.sectionOrder, state.profile), key];
+    state.profile[key] = "";
+    state.tailoredProfile = null;
+    renderSectionEditor();
+    renderPreview(state.profile, "基础版");
+    saveState();
+  }
+
+  function removeCustomSection(key) {
+    if (!core.isCustomSectionKey(key)) {
+      return;
+    }
+    collectProfileFromEditors();
+    delete state.profile[key];
+    if (state.profile.sectionTitles) {
+      delete state.profile.sectionTitles[key];
+    }
+    state.profile.sectionOrder = core.normalizeSectionOrder(state.profile.sectionOrder, state.profile).filter((item) => item !== key);
+    state.tailoredProfile = null;
+    renderSectionEditor();
+    renderPreview(state.profile, "基础版");
+    saveState();
+  }
+
   function renderPreview(profile, label) {
-    els.preview.innerHTML = core.renderResumeHtml(profile);
+    const template = els.resumeTemplate.value || core.normalizeTemplateId(profile && profile.template);
+    els.resumeTemplate.value = template;
+    els.preview.innerHTML = core.renderResumeHtml(Object.assign({}, profile, { template }), template);
     els.previewState.textContent = label;
   }
 
@@ -638,15 +672,12 @@
       rawResumeText: els.rawResume.value,
       currentJD: Object.assign({}, state.jd || {}, { text: els.jdText.value }),
       tailoredProfile: state.tailoredProfile,
-      llmSettings: readSettingsFromInputs(),
-      autopilotSettings: readAutopilotSettingsFromInputs()
+      llmSettings: readSettingsFromInputs()
     });
     state.llmSettings = readSettingsFromInputs();
-    state.autopilot = readAutopilotSettingsFromInputs();
     updateResumeState();
     updateJdState();
     updateLlmState();
-    updateAutopilotState();
     setFileStatus("已保存到浏览器本地。");
   }
 
@@ -670,16 +701,20 @@
   }
 
   async function exportPdf() {
-    await chrome.storage.local.set({ exportResume: state.tailoredProfile || state.profile });
+    collectProfileFromEditors();
+    const profile = Object.assign({}, state.tailoredProfile || state.profile, { template: els.resumeTemplate.value });
+    await chrome.storage.local.set({ exportResume: profile });
     await chrome.tabs.create({ url: chrome.runtime.getURL("export.html") });
   }
 
   function exportWord() {
-    core.downloadWord(state.tailoredProfile || state.profile, "tailored-resume");
+    collectProfileFromEditors();
+    const profile = Object.assign({}, state.tailoredProfile || state.profile, { template: els.resumeTemplate.value });
+    core.downloadWord(profile, "tailored-resume", els.resumeTemplate.value);
   }
 
   function updateResumeState() {
-    const filled = core.SECTION_KEYS.filter((key) => core.cleanText(state.profile[key])).length;
+    const filled = core.getAllSectionKeys(state.profile).filter((key) => core.cleanText(state.profile[key])).length;
     els.resumeState.textContent = filled ? `已解析 ${filled} 项` : "未解析";
   }
 
@@ -702,467 +737,6 @@
   function updateLlmState() {
     const settings = readSettingsFromInputs();
     els.llmState.textContent = settings.baseUrl && settings.model && settings.apiKey ? "已配置" : "未配置";
-  }
-
-  function defaultAutopilotSettings() {
-    return {
-      keywords: "",
-      location: "",
-      searchUrls: [
-        "https://www.bing.com/search?q={keywords}%20{location}%20site%3Alinkedin.com%2Fjobs",
-        "https://www.bing.com/search?q={keywords}%20{location}%20site%3Aindeed.com%2Fjobs",
-        "https://www.bing.com/search?q={keywords}%20{location}%20site%3Abosszhipin.com%2Fjob_detail",
-        "https://www.bing.com/search?q={keywords}%20{location}%20site%3Aliepin.com%2Fjob",
-        "https://www.bing.com/search?q={keywords}%20{location}%20site%3Azhaopin.com%2Fjob",
-        "https://www.bing.com/search?q={keywords}%20{location}%20site%3Alagou.com%2Fjobs"
-      ].join("\n"),
-      include: "",
-      exclude: "",
-      minScore: 45,
-      maxApply: 5,
-      maxJobs: 20,
-      autoSubmit: false,
-      closeTabs: true,
-      candidate: {
-        name: "",
-        email: "",
-        phone: "",
-        portfolio: ""
-      },
-      coverLetter: "您好，我对 {jobTitle} 岗位很感兴趣。我的经历与 {keywords} 等要求相关，已准备好简历材料，期待进一步沟通。\n{name}",
-      log: []
-    };
-  }
-
-  function populateAutopilotSettings() {
-    const settings = Object.assign(defaultAutopilotSettings(), state.autopilot || {});
-    const inferred = extractCandidateFromProfile();
-    els.autoKeywords.value = settings.keywords || "";
-    els.autoLocation.value = settings.location || "";
-    els.autoSearchUrls.value = settings.searchUrls || "";
-    els.autoInclude.value = settings.include || "";
-    els.autoExclude.value = settings.exclude || "";
-    els.autoMinScore.value = String(settings.minScore || 45);
-    els.autoMaxApply.value = String(settings.maxApply || 5);
-    els.autoMaxJobs.value = String(settings.maxJobs || 20);
-    els.autoSubmit.checked = Boolean(settings.autoSubmit);
-    els.autoCloseTabs.checked = settings.closeTabs !== false;
-    els.autoName.value = settings.candidate && settings.candidate.name || inferred.name || "";
-    els.autoEmail.value = settings.candidate && settings.candidate.email || inferred.email || "";
-    els.autoPhone.value = settings.candidate && settings.candidate.phone || inferred.phone || "";
-    els.autoPortfolio.value = settings.candidate && settings.candidate.portfolio || "";
-    els.autoCoverLetter.value = settings.coverLetter || "";
-    updateAutopilotState();
-    renderAutopilotLog();
-  }
-
-  function readAutopilotSettingsFromInputs() {
-    const existingLog = state.autopilot && Array.isArray(state.autopilot.log) ? state.autopilot.log : [];
-    return {
-      keywords: els.autoKeywords.value.trim(),
-      location: els.autoLocation.value.trim(),
-      searchUrls: els.autoSearchUrls.value.trim(),
-      include: els.autoInclude.value.trim(),
-      exclude: els.autoExclude.value.trim(),
-      minScore: clampNumber(els.autoMinScore.value, 0, 100, 45),
-      maxApply: clampNumber(els.autoMaxApply.value, 1, 50, 5),
-      maxJobs: clampNumber(els.autoMaxJobs.value, 1, 100, 20),
-      autoSubmit: els.autoSubmit.checked,
-      closeTabs: els.autoCloseTabs.checked,
-      candidate: {
-        name: els.autoName.value.trim(),
-        email: els.autoEmail.value.trim(),
-        phone: els.autoPhone.value.trim(),
-        portfolio: els.autoPortfolio.value.trim()
-      },
-      coverLetter: els.autoCoverLetter.value.trim(),
-      log: existingLog.slice(-200)
-    };
-  }
-
-  async function saveAutopilotSettings() {
-    state.autopilot = readAutopilotSettingsFromInputs();
-    await chrome.storage.local.set({ autopilotSettings: state.autopilot });
-    updateAutopilotState();
-    appendAutopilotLog("配置", "自动投递配置已保存。");
-  }
-
-  async function startAutopilot() {
-    if (state.autopilotRunning) {
-      appendAutopilotLog("运行", "自动投递已经在运行。");
-      return;
-    }
-
-    state.autopilot = readAutopilotSettingsFromInputs();
-    validateAutopilotSettings(state.autopilot);
-    await ensureAutomationPermissions(state.autopilot);
-    state.autopilotRunning = true;
-    updateAutopilotState();
-    appendAutopilotLog("开始", `开始搜索：${state.autopilot.keywords || "未填写关键词"}`);
-
-    let processed = 0;
-    let applied = 0;
-    const seenJobs = new Set();
-    const searchUrls = buildSearchUrls(state.autopilot);
-
-    try {
-      for (const searchUrl of searchUrls) {
-        if (!state.autopilotRunning || processed >= state.autopilot.maxJobs || applied >= state.autopilot.maxApply) {
-          break;
-        }
-        const links = await extractLinksFromSearchPage(searchUrl);
-        appendAutopilotLog("搜索", `从搜索页提取 ${links.length} 个候选职位。`, searchUrl);
-
-        for (const link of links) {
-          if (!state.autopilotRunning || processed >= state.autopilot.maxJobs || applied >= state.autopilot.maxApply) {
-            break;
-          }
-          if (seenJobs.has(link.href)) {
-            continue;
-          }
-          seenJobs.add(link.href);
-
-          const linkScore = scoreCandidateText(`${link.text}\n${link.snippet}`, state.autopilot);
-          if (linkScore < Math.max(10, state.autopilot.minScore - 25)) {
-            appendAutopilotLog("跳过", `搜索结果初筛分 ${linkScore}，低于阈值。`, link.href);
-            continue;
-          }
-
-          processed += 1;
-          const result = await processJobPage(link);
-          if (result.countedAsApplication) {
-            applied += 1;
-          }
-        }
-      }
-    } finally {
-      state.autopilotRunning = false;
-      updateAutopilotState();
-      appendAutopilotLog("完成", `本轮处理 ${processed} 个职位，计入投递/准备 ${applied} 个。`);
-      await chrome.storage.local.set({ autopilotSettings: state.autopilot });
-    }
-  }
-
-  function stopAutopilot() {
-    state.autopilotRunning = false;
-    updateAutopilotState();
-    appendAutopilotLog("停止", "已请求停止，当前页面处理完成后会退出。");
-  }
-
-  async function processJobPage(link) {
-    const tab = await openManagedTab(link.href, false);
-    try {
-      await injectScript(tab.id, "src/content.js");
-      const jdResponse = await sendTabMessage(tab.id, { type: "RESUME_TAILOR_EXTRACT_JD" });
-      const jd = jdResponse && jdResponse.ok ? jdResponse.jd : { title: link.text, text: link.snippet, url: link.href };
-      const fullText = `${jd.title || link.text}\n${jd.text || ""}`;
-      const score = scoreCandidateText(fullText, state.autopilot);
-
-      if (score < state.autopilot.minScore) {
-        appendAutopilotLog("跳过", `匹配分 ${score}，低于阈值 ${state.autopilot.minScore}。`, link.href);
-        if (state.autopilot.closeTabs) {
-          await safeCloseTab(tab.id);
-        }
-        return { countedAsApplication: false };
-      }
-
-      await injectScript(tab.id, "src/autopilot-content.js");
-      const keywords = core.extractKeywords(fullText, 8).map((item) => item.term).join("、");
-      const candidate = buildCandidatePayload();
-      const coverLetter = buildCoverLetter(state.autopilot.coverLetter, {
-        jobTitle: jd.title || link.text || "目标岗位",
-        company: "",
-        keywords,
-        name: candidate.name || ""
-      });
-      const applyResponse = await sendTabMessage(tab.id, {
-        type: "AUTOPILOT_APPLY_JOB",
-        payload: {
-          candidate,
-          coverLetter,
-          autoSubmit: state.autopilot.autoSubmit,
-          maxSteps: 7
-        }
-      });
-
-      if (!applyResponse || !applyResponse.ok) {
-        appendAutopilotLog("失败", applyResponse && applyResponse.error || "投递脚本未返回结果。", link.href);
-        if (!state.autopilot.closeTabs) {
-          await chrome.tabs.update(tab.id, { active: true });
-        } else {
-          await safeCloseTab(tab.id);
-        }
-        return { countedAsApplication: false };
-      }
-
-      const result = applyResponse.result;
-      const statusText = result.submitted
-        ? "已自动提交"
-        : result.needsLogin
-          ? "需要先登录招聘网站"
-          : result.needsManualFileUpload
-            ? "需要手动上传简历文件"
-            : result.blockingRequiredFields
-              ? "存在未识别的必填项，需要手动确认"
-              : "已自动填表，等待最终确认";
-      appendAutopilotLog("投递", `${statusText}；匹配分 ${score}；填充 ${result.filledCount} 个字段。`, link.href);
-
-      if (result.needsLogin || result.needsManualFileUpload || result.blockingRequiredFields || (!result.submitted && !state.autopilot.autoSubmit)) {
-        await chrome.tabs.update(tab.id, { active: true });
-      } else if (state.autopilot.closeTabs) {
-        await safeCloseTab(tab.id);
-      }
-
-      return { countedAsApplication: true };
-    } catch (error) {
-      appendAutopilotLog("错误", error.message || "处理职位页失败。", link.href);
-      if (state.autopilot.closeTabs) {
-        await safeCloseTab(tab.id);
-      }
-      return { countedAsApplication: false };
-    }
-  }
-
-  async function extractLinksFromSearchPage(url) {
-    const tab = await openManagedTab(url, false);
-    try {
-      await injectScript(tab.id, "src/autopilot-content.js");
-      const response = await sendTabMessage(tab.id, { type: "AUTOPILOT_EXTRACT_JOB_LINKS" });
-      return uniqueLinks(response && response.ok ? response.links : []);
-    } finally {
-      if (state.autopilot.closeTabs) {
-        await safeCloseTab(tab.id);
-      }
-    }
-  }
-
-  async function openManagedTab(url, active) {
-    await ensureUrlHostAccess(url);
-    const tab = await chrome.tabs.create({ url, active });
-    await waitForTabLoaded(tab.id, 25000);
-    return tab;
-  }
-
-  function waitForTabLoaded(tabId, timeoutMs) {
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        chrome.tabs.onUpdated.removeListener(listener);
-        reject(new Error("页面加载超时。"));
-      }, timeoutMs);
-      const listener = (updatedTabId, changeInfo) => {
-        if (updatedTabId === tabId && changeInfo.status === "complete") {
-          clearTimeout(timer);
-          chrome.tabs.onUpdated.removeListener(listener);
-          resolve();
-        }
-      };
-      chrome.tabs.onUpdated.addListener(listener);
-      chrome.tabs.get(tabId, (tab) => {
-        if (chrome.runtime.lastError) {
-          clearTimeout(timer);
-          chrome.tabs.onUpdated.removeListener(listener);
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
-        }
-        if (tab && tab.status === "complete") {
-          clearTimeout(timer);
-          chrome.tabs.onUpdated.removeListener(listener);
-          resolve();
-        }
-      });
-    });
-  }
-
-  async function injectScript(tabId, file) {
-    await chrome.scripting.executeScript({ target: { tabId }, files: [file] });
-  }
-
-  function sendTabMessage(tabId, message) {
-    return chrome.tabs.sendMessage(tabId, message);
-  }
-
-  async function safeCloseTab(tabId) {
-    try {
-      await chrome.tabs.remove(tabId);
-    } catch (error) {
-      // Ignore tabs that users closed manually.
-    }
-  }
-
-  async function ensureAutomationPermissions(settings) {
-    if (chrome.permissions) {
-      const hasTabs = await chrome.permissions.contains({ permissions: ["tabs"] });
-      if (!hasTabs) {
-        const granted = await chrome.permissions.request({ permissions: ["tabs"] });
-        if (!granted) {
-          throw new Error("自动搜索需要 tabs 权限。");
-        }
-      }
-      const broadOrigins = ["http://*/*", "https://*/*"];
-      const hasBroadHostAccess = await chrome.permissions.contains({ origins: broadOrigins });
-      if (!hasBroadHostAccess) {
-        const granted = await chrome.permissions.request({ origins: broadOrigins });
-        if (!granted) {
-          throw new Error("全自动搜索/投递需要网页访问授权。");
-        }
-      }
-    }
-    const urls = buildSearchUrls(settings);
-    for (const url of urls) {
-      await ensureUrlHostAccess(url);
-    }
-  }
-
-  async function ensureUrlHostAccess(url) {
-    if (!chrome.permissions) {
-      return;
-    }
-    const protocol = new URL(url).protocol;
-    const broadOrigin = protocol === "http:" ? "http://*/*" : "https://*/*";
-    const hasBroadAccess = await chrome.permissions.contains({ origins: [broadOrigin] });
-    if (hasBroadAccess) {
-      return;
-    }
-    const origin = new URL(url).origin + "/*";
-    const hasAccess = await chrome.permissions.contains({ origins: [origin] });
-    if (hasAccess) {
-      return;
-    }
-    const granted = await chrome.permissions.request({ origins: [origin] });
-    if (!granted) {
-      throw new Error(`未授权访问：${new URL(url).origin}`);
-    }
-  }
-
-  function validateAutopilotSettings(settings) {
-    if (!settings.searchUrls.trim()) {
-      throw new Error("请至少配置一个搜索 URL 模板。");
-    }
-    if (!settings.keywords.trim() && !settings.include.trim()) {
-      throw new Error("请填写搜索关键词或必须包含条件。");
-    }
-  }
-
-  function buildSearchUrls(settings) {
-    return settings.searchUrls
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((template) => template
-        .replaceAll("{keywords}", encodeURIComponent(settings.keywords))
-        .replaceAll("{location}", encodeURIComponent(settings.location)))
-      .filter((url) => /^https?:\/\//i.test(url));
-  }
-
-  function scoreCandidateText(text, settings) {
-    const haystack = String(text || "").toLowerCase();
-    const includeTerms = splitTerms(`${settings.keywords},${settings.include}`);
-    const excludeTerms = splitTerms(settings.exclude);
-    if (excludeTerms.some((term) => haystack.includes(term.toLowerCase()))) {
-      return -100;
-    }
-    let score = 0;
-    includeTerms.forEach((term) => {
-      if (haystack.includes(term.toLowerCase())) {
-        score += 18;
-      }
-    });
-    const profileTerms = core.extractKeywords(core.SECTION_KEYS.map((key) => state.profile[key]).join("\n"), 12);
-    profileTerms.forEach((item) => {
-      if (haystack.includes(item.term.toLowerCase())) {
-        score += 5;
-      }
-    });
-    return Math.min(100, Math.max(0, score));
-  }
-
-  function splitTerms(value) {
-    return String(value || "")
-      .split(/[,，;；\n]/)
-      .map((term) => term.trim())
-      .filter(Boolean);
-  }
-
-  function uniqueLinks(links) {
-    const seen = new Set();
-    return (Array.isArray(links) ? links : []).filter((link) => {
-      if (!link || !link.href || seen.has(link.href)) {
-        return false;
-      }
-      seen.add(link.href);
-      return true;
-    });
-  }
-
-  function buildCandidatePayload() {
-    const inferred = extractCandidateFromProfile();
-    const candidate = state.autopilot.candidate || {};
-    return {
-      name: candidate.name || inferred.name || "",
-      email: candidate.email || inferred.email || "",
-      phone: candidate.phone || inferred.phone || "",
-      portfolio: candidate.portfolio || ""
-    };
-  }
-
-  function extractCandidateFromProfile() {
-    const personal = state.profile && state.profile.personal || "";
-    const lines = personal.split("\n").map((line) => line.trim()).filter(Boolean);
-    return {
-      name: lines.find((line) => line.length <= 24 && !/@|电话|手机|邮箱|email|phone|\d{5,}/i.test(line)) || "",
-      email: (personal.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i) || [""])[0],
-      phone: (personal.match(/(?:\+?\d[\d\s-]{7,}\d)/) || [""])[0].replace(/\s+/g, " ")
-    };
-  }
-
-  function buildCoverLetter(template, values) {
-    return String(template || "")
-      .replaceAll("{jobTitle}", values.jobTitle || "")
-      .replaceAll("{company}", values.company || "")
-      .replaceAll("{keywords}", values.keywords || "")
-      .replaceAll("{name}", values.name || "");
-  }
-
-  function appendAutopilotLog(type, text, url) {
-    const item = {
-      at: new Date().toLocaleTimeString(),
-      type,
-      text,
-      url: url || ""
-    };
-    state.autopilot.log = [item, ...(state.autopilot.log || [])].slice(0, 200);
-    renderAutopilotLog();
-  }
-
-  function renderAutopilotLog() {
-    if (!els.autopilotLog) {
-      return;
-    }
-    els.autopilotLog.innerHTML = "";
-    (state.autopilot.log || []).slice(0, 80).forEach((item) => {
-      const row = document.createElement("div");
-      row.className = "log-entry";
-      const type = document.createElement("div");
-      type.className = "log-entry__type";
-      type.textContent = `${item.type}`;
-      const text = document.createElement("div");
-      text.className = "log-entry__text";
-      text.textContent = `${item.at || ""} ${item.text || ""}${item.url ? ` ${item.url}` : ""}`;
-      row.append(type, text);
-      els.autopilotLog.appendChild(row);
-    });
-  }
-
-  function updateAutopilotState() {
-    els.autopilotState.textContent = state.autopilotRunning ? "运行中" : "待命";
-  }
-
-  function clampNumber(value, min, max, fallback) {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) {
-      return fallback;
-    }
-    return Math.min(max, Math.max(min, parsed));
   }
 
   function setFileStatus(message) {
@@ -1286,13 +860,19 @@
   function mergeLlmProfile(llmProfile) {
     const base = core.normalizeProfile(state.profile);
     const incoming = llmProfile && typeof llmProfile === "object" ? llmProfile : {};
-    core.SECTION_KEYS.forEach((key) => {
+    core.getAllSectionKeys(Object.assign({}, base, incoming)).forEach((key) => {
       if (typeof incoming[key] === "string") {
         base[key] = incoming[key].trim();
       }
     });
     if (Array.isArray(incoming.sectionOrder)) {
-      base.sectionOrder = core.normalizeSectionOrder(incoming.sectionOrder);
+      base.sectionOrder = core.normalizeSectionOrder(incoming.sectionOrder, Object.assign({}, base, incoming));
+    }
+    if (incoming.sectionTitles && typeof incoming.sectionTitles === "object") {
+      base.sectionTitles = Object.assign({}, base.sectionTitles, incoming.sectionTitles);
+    }
+    if (incoming.template) {
+      base.template = core.normalizeTemplateId(incoming.template);
     }
     base.avatarDataUrl = state.profile.avatarDataUrl;
     base.raw = state.profile.raw;
@@ -1302,10 +882,12 @@
   function serializeProfileForLlm(profile) {
     const data = core.normalizeProfile(profile);
     const payload = {};
-    core.SECTION_KEYS.forEach((key) => {
+    core.getAllSectionKeys(data).forEach((key) => {
       payload[key] = limitText(data[key], 6000);
     });
     payload.sectionOrder = data.sectionOrder;
+    payload.sectionTitles = data.sectionTitles;
+    payload.template = data.template;
     return payload;
   }
 

@@ -1,6 +1,8 @@
 (function () {
   const BODY_SECTION_KEYS = ["summary", "skills", "work", "projects", "education", "awards"];
   const SECTION_KEYS = ["personal", ...BODY_SECTION_KEYS];
+  const CUSTOM_SECTION_PREFIX = "custom_";
+  const DEFAULT_RESUME_TEMPLATE = "professional";
 
   const SECTION_LABELS = {
     personal: "个人信息",
@@ -11,6 +13,12 @@
     education: "教育经历",
     awards: "荣誉 / 证书"
   };
+
+  const RESUME_TEMPLATES = [
+    { id: "professional", name: "专业经典" },
+    { id: "modern", name: "现代强调" },
+    { id: "compact", name: "紧凑 ATS" }
+  ];
 
   const SECTION_ALIASES = {
     personal: ["个人信息", "基本信息", "联系方式", "contact", "personal information", "profile"],
@@ -53,6 +61,8 @@
       awards: "",
       raw: "",
       avatarDataUrl: "",
+      sectionTitles: {},
+      template: DEFAULT_RESUME_TEMPLATE,
       sectionOrder: defaultSectionOrder()
     };
   }
@@ -202,7 +212,8 @@
     const source = normalizeProfile(profile);
     const keywords = extractKeywords(jdText, 32);
     const keywordTerms = keywords.map((item) => item.term);
-    const resumeText = SECTION_KEYS.map((key) => source[key]).join("\n").toLowerCase();
+    const allSectionKeys = getAllSectionKeys(source);
+    const resumeText = allSectionKeys.map((key) => source[key]).join("\n").toLowerCase();
     const matched = keywordTerms.filter((term) => resumeText.includes(term.toLowerCase())).slice(0, 12);
     const missing = keywordTerms.filter((term) => !resumeText.includes(term.toLowerCase())).slice(0, 10);
 
@@ -216,8 +227,15 @@
       awards: rankLines(source.awards, keywordTerms).join("\n"),
       raw: source.raw,
       avatarDataUrl: source.avatarDataUrl,
+      sectionTitles: Object.assign({}, source.sectionTitles),
+      template: source.template,
       sectionOrder: rankSectionOrder(source, keywordTerms)
     };
+    allSectionKeys
+      .filter(isCustomSectionKey)
+      .forEach((key) => {
+        tailored[key] = rankLines(source[key], keywordTerms).join("\n");
+      });
 
     const suggestions = buildSuggestions(source, keywordTerms, matched, missing);
     return {
@@ -230,7 +248,7 @@
   }
 
   function rankSectionOrder(profile, keywordTerms) {
-    const order = normalizeSectionOrder(profile.sectionOrder);
+    const order = normalizeSectionOrder(profile.sectionOrder, profile);
     return order
       .map((key, index) => ({
         key,
@@ -318,11 +336,12 @@
     }, 0);
   }
 
-  function renderResumeHtml(profile) {
+  function renderResumeHtml(profile, templateId) {
     const data = normalizeProfile(profile);
+    const template = normalizeTemplateId(templateId || data.template);
     const name = extractName(data.personal) || "姓名";
     const contact = removeFirstLine(data.personal, name);
-    const sectionOrder = normalizeSectionOrder(data.sectionOrder);
+    const sectionOrder = normalizeSectionOrder(data.sectionOrder, data);
     const sectionHtml = sectionOrder
       .filter((key) => cleanText(data[key]))
       .map((key) => {
@@ -330,7 +349,7 @@
         const body = lines.length > 1
           ? `<ul>${lines.map((line) => `<li>${escapeHtml(stripBullet(line))}</li>`).join("")}</ul>`
           : `<p>${escapeHtml(lines[0] || "")}</p>`;
-        return `<section class="resume__section"><h2>${SECTION_LABELS[key]}</h2>${body}</section>`;
+        return `<section class="resume__section"><h2>${escapeHtml(getSectionTitle(data, key))}</h2>${body}</section>`;
       })
       .join("");
 
@@ -339,7 +358,7 @@
       : "";
 
     return [
-      '<article class="resume">',
+      `<article class="resume resume--${escapeAttribute(template)}">`,
       '<header class="resume__header">',
       '<div class="resume__header-main">',
       `<h1 class="resume__name">${escapeHtml(name)}</h1>`,
@@ -352,22 +371,15 @@
     ].join("");
   }
 
-  function downloadWord(profile, filename) {
+  function downloadWord(profile, filename, templateId) {
     const html = [
       '<!doctype html>',
       '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" lang="zh-CN">',
       '<head><meta charset="utf-8"><title>Resume</title>',
       '<style>',
-      'body{font-family:Georgia,"Times New Roman","Noto Serif SC",serif;color:#151a22;}',
-      '.resume__header{display:flex;gap:18px;justify-content:space-between;padding-bottom:12px;border-bottom:2px solid #1b365d;}',
-      '.resume__avatar{width:86px;height:108px;border:1px solid #c7d1df;object-fit:cover;}',
-      '.resume__name{margin:0;font-size:30px;line-height:1.15;}',
-      '.resume__contact{margin-top:8px;color:#4a5567;font-family:Arial,sans-serif;font-size:12px;}',
-      '.resume__section{margin-top:17px;}',
-      '.resume__section h2{margin:0 0 8px;padding-bottom:4px;border-bottom:1px solid #c7d1df;color:#1b365d;font-family:Arial,sans-serif;font-size:14px;}',
-      '.resume__section p,.resume__section li{font-size:13px;line-height:1.55;}',
+      buildWordResumeStyles(),
       '</style></head><body>',
-      renderResumeHtml(profile),
+      renderResumeHtml(profile, templateId),
       '</body></html>'
     ].join("");
 
@@ -380,6 +392,30 @@
     anchor.click();
     anchor.remove();
     URL.revokeObjectURL(url);
+  }
+
+  function buildWordResumeStyles() {
+    return [
+      'body{font-family:Georgia,"Times New Roman","Noto Serif SC",serif;color:#151a22;}',
+      '.resume{font-family:Georgia,"Times New Roman","Noto Serif SC",serif;}',
+      '.resume--modern{font-family:Arial,"Microsoft YaHei",sans-serif;}',
+      '.resume--compact{font-family:Arial,"Microsoft YaHei",sans-serif;}',
+      '.resume__header{display:flex;gap:18px;justify-content:space-between;padding-bottom:12px;border-bottom:2px solid #1b365d;}',
+      '.resume--modern .resume__header{border-bottom:4px solid #0f766e;}',
+      '.resume--compact .resume__header{padding-bottom:8px;border-bottom:1px solid #334155;}',
+      '.resume__avatar{width:86px;height:108px;border:1px solid #c7d1df;object-fit:cover;}',
+      '.resume--modern .resume__avatar{border-radius:50%;width:84px;height:84px;}',
+      '.resume__name{margin:0;font-size:30px;line-height:1.15;}',
+      '.resume--compact .resume__name{font-size:25px;}',
+      '.resume__contact{margin-top:8px;color:#4a5567;font-family:Arial,sans-serif;font-size:12px;}',
+      '.resume__section{margin-top:17px;}',
+      '.resume--compact .resume__section{margin-top:11px;}',
+      '.resume__section h2{margin:0 0 8px;padding-bottom:4px;border-bottom:1px solid #c7d1df;color:#1b365d;font-family:Arial,sans-serif;font-size:14px;}',
+      '.resume--modern .resume__section h2{border-bottom:0;color:#0f766e;text-transform:uppercase;}',
+      '.resume--compact .resume__section h2{margin-bottom:5px;color:#111827;font-size:12px;}',
+      '.resume__section p,.resume__section li{font-size:13px;line-height:1.55;}',
+      '.resume--compact .resume__section p,.resume--compact .resume__section li{font-size:12px;line-height:1.42;}'
+    ].join("");
   }
 
   async function extractTextFromFile(file) {
@@ -544,16 +580,18 @@
 
   function normalizeProfile(profile) {
     const data = Object.assign(emptyProfile(), profile || {});
-    data.sectionOrder = normalizeSectionOrder(data.sectionOrder);
+    data.sectionTitles = Object.assign({}, profile && profile.sectionTitles || {});
+    data.template = normalizeTemplateId(data.template);
+    data.sectionOrder = normalizeSectionOrder(data.sectionOrder, data);
     return data;
   }
 
-  function normalizeSectionOrder(sectionOrder) {
+  function normalizeSectionOrder(sectionOrder, profile) {
     const incoming = Array.isArray(sectionOrder) ? sectionOrder : [];
     const seen = new Set();
     const order = [];
     incoming.forEach((key) => {
-      if (BODY_SECTION_KEYS.includes(key) && !seen.has(key)) {
+      if (isSectionKeyAllowed(key) && !seen.has(key)) {
         seen.add(key);
         order.push(key);
       }
@@ -563,7 +601,47 @@
         order.push(key);
       }
     });
+    Object.keys(profile || {}).forEach((key) => {
+      if (isCustomSectionKey(key) && !seen.has(key)) {
+        seen.add(key);
+        order.push(key);
+      }
+    });
     return order;
+  }
+
+  function getAllSectionKeys(profile) {
+    const data = profile ? normalizeProfileShallow(profile) : emptyProfile();
+    return ["personal", ...normalizeSectionOrder(data.sectionOrder, data)];
+  }
+
+  function normalizeProfileShallow(profile) {
+    return Object.assign(emptyProfile(), profile || {}, {
+      sectionTitles: Object.assign({}, profile && profile.sectionTitles || {}),
+      template: normalizeTemplateId(profile && profile.template)
+    });
+  }
+
+  function getSectionTitle(profile, key) {
+    const titles = profile && profile.sectionTitles || {};
+    return cleanText(titles[key]) || SECTION_LABELS[key] || "自定义模块";
+  }
+
+  function isSectionKeyAllowed(key) {
+    return BODY_SECTION_KEYS.includes(key) || isCustomSectionKey(key);
+  }
+
+  function isCustomSectionKey(key) {
+    return typeof key === "string" && key.startsWith(CUSTOM_SECTION_PREFIX);
+  }
+
+  function createCustomSectionKey() {
+    return `${CUSTOM_SECTION_PREFIX}${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+  }
+
+  function normalizeTemplateId(templateId) {
+    const id = String(templateId || DEFAULT_RESUME_TEMPLATE).trim();
+    return RESUME_TEMPLATES.some((template) => template.id === id) ? id : DEFAULT_RESUME_TEMPLATE;
   }
 
   function cleanText(value) {
@@ -659,9 +737,15 @@
     SECTION_KEYS,
     BODY_SECTION_KEYS,
     SECTION_LABELS,
+    RESUME_TEMPLATES,
     emptyProfile,
     defaultSectionOrder,
     normalizeSectionOrder,
+    getAllSectionKeys,
+    getSectionTitle,
+    isCustomSectionKey,
+    createCustomSectionKey,
+    normalizeTemplateId,
     parseResumeText,
     extractKeywords,
     tailorResume,

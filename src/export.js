@@ -7,8 +7,8 @@
 
   document.addEventListener("DOMContentLoaded", async () => {
     const stored = await chrome.storage.local.get(["exportResume", "tailoredProfile", "resumeProfile"]);
-    exportProfile = stored.exportResume || stored.tailoredProfile || stored.resumeProfile || core.emptyProfile();
-    root.innerHTML = core.renderResumeHtml(exportProfile);
+    exportProfile = core.normalizeProfile(stored.exportResume || stored.tailoredProfile || stored.resumeProfile || core.emptyProfile());
+    root.innerHTML = core.renderResumeHtml(exportProfile, exportProfile.template);
   });
 
   printButton.addEventListener("click", () => {
@@ -16,6 +16,6 @@
   });
 
   wordButton.addEventListener("click", () => {
-    core.downloadWord(exportProfile, "tailored-resume");
+    core.downloadWord(exportProfile, "tailored-resume", exportProfile.template);
   });
 })();
