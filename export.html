@@ -8,8 +8,14 @@
   </head>
   <body>
     <header class="export-toolbar">
-      <button id="print-pdf" class="button button--primary" type="button">打印 / 保存 PDF</button>
-      <button id="download-word" class="button" type="button">下载 Word</button>
+      <div class="export-toolbar__title">
+        <span class="brand-mark">RB</span>
+        <span>简历导出</span>
+      </div>
+      <div class="export-toolbar__actions">
+        <button id="print-pdf" class="button button--primary" type="button">打印 / 保存 PDF</button>
+        <button id="download-word" class="button" type="button">下载 Word</button>
+      </div>
     </header>
     <main id="export-root" class="resume-document"></main>
 
